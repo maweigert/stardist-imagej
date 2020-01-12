@@ -1,5 +1,8 @@
 package de.csbdresden.stardist;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
@@ -16,6 +19,10 @@ import net.imagej.DatasetService;
 import net.imagej.ImgPlus;
 import net.imagej.axis.AxisType;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.util.Pair;
+import net.imglib2.util.ValuePair;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class Utils {
 
@@ -70,6 +77,34 @@ public class Utils {
 
     public static Dataset raiToDataset(final DatasetService dataset, final String name, final RandomAccessibleInterval rai, final Collection<AxisType> axesCollection) {
         return raiToDataset(dataset, name, rai, axesCollection.stream());
+    }
+
+    public static Pair<float[], int[]> readRayVerticesFaces(final File raysFile) throws IOException {
+
+        final String content = new String ( Files.readAllBytes(raysFile.toPath()));
+        System.out.println(content);
+
+        JSONObject jo = new JSONObject(content);
+
+        JSONArray ja_vert = jo.getJSONArray("vertices");
+        JSONArray ja_face = jo.getJSONArray("faces");
+
+        if (ja_vert.length()==0 || ja_face.length()==0)
+            throw new RuntimeException("not vertices and faces found");
+
+        float[] vertices = new float[ja_vert.length()];
+        for(int i=0;i<ja_vert.length();i++)
+            vertices[i] = (float)ja_vert.getDouble(i);
+        int[] faces = new int[ja_face.length()];
+        for(int i=0;i<ja_face.length();i++)
+            faces[i] = ja_face.getInt(i);
+
+        if (ja_vert.length()%3!=0 || ja_face.length()%3!=0)
+            throw new RuntimeException("vertices and faces should be divisible by 3!");
+
+        System.out.println("found "+vertices.length/3+" vertices and "+ faces.length/3 +" faces");
+        return new ValuePair<float[], int[]>(vertices, faces);
+
     }
 
 }

@@ -134,5 +134,24 @@
 			<artifactId>csbdeep</artifactId>
 			<version>0.3.5-SNAPSHOT</version>
 		</dependency>
+		<!-- JNA  -->
+		<dependency>
+			<groupId>net.java.dev.jna</groupId>
+			<artifactId>jna</artifactId>
+			<version>4.5.2</version>
+		</dependency>
+		<!-- JNA  -->
+		<dependency>
+			<groupId>net.java.dev.jna</groupId>
+			<artifactId>jna-platform</artifactId>
+			<version>4.5.2</version>
+		</dependency>
+		<!-- JSON -->
+		<dependency>
+			<groupId>org.json</groupId>
+			<artifactId>json</artifactId>
+			<version>20190722</version>
+		</dependency>
+
 	</dependencies>
 </project>
