@@ -2,28 +2,15 @@ package de.csbdresden.stardist;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
-import ij.IJ;
 import net.imagej.Dataset;
 import net.imagej.ImageJ;
-import net.imagej.ImgPlus;
 import net.imagej.ops.OpService;
-import net.imglib2.Cursor;
 import net.imglib2.FinalInterval;
 import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.algorithm.labeling.ConnectedComponents;
-import net.imglib2.converter.Converter;
-import net.imglib2.converter.Converters;
-import net.imglib2.img.Img;
-import net.imglib2.img.ImgFactory;
 import net.imglib2.img.array.ArrayImg;
 import net.imglib2.img.array.ArrayImgs;
 import net.imglib2.img.basictypeaccess.array.IntArray;
-import net.imglib2.img.cell.CellImgFactory;
-import net.imglib2.img.display.imagej.ImageJFunctions;
-import net.imglib2.roi.labeling.ImgLabeling;
-import net.imglib2.type.numeric.integer.ByteType;
-import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.integer.UnsignedIntType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Pair;
@@ -36,18 +23,11 @@ import org.scijava.plugin.Menu;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 import org.scijava.widget.NumberWidget;
-import sc.fiji.labeleditor.core.model.DefaultLabelEditorModel;
-import sc.fiji.labeleditor.core.model.LabelEditorModel;
-import sc.fiji.labeleditor.plugin.interfaces.bdv.LabelEditorBdvPanel;
-
-import javax.swing.*;
-import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -77,10 +57,6 @@ public class StarDist3D extends StarDist3DBase implements Command {
 
     @Parameter(label=Opt.NUM_TILES, min="1", stepSize="1")
     private int nTiles = (int) Opt.getDefault(Opt.NUM_TILES);
-
-    @Parameter(label="Open labels in LabelEditor")
-    private boolean openLabelEditor = false;
-
 
     @Parameter(label=Opt.LABEL_IMAGE, type=ItemIO.OUTPUT)
     private Dataset label;
@@ -128,43 +104,6 @@ public class StarDist3D extends StarDist3DBase implements Command {
 
             label = renderPolyhedra(distAndPointSurvivor.getA(), distAndPointSurvivor.getB(),
                     vertsAndFaces.getA(), vertsAndFaces.getB(), dims);
-
-            // show in LabelEditor
-//            Img<IntType> input_img = (Img<IntType>) opService.run(net.imagej.ops.create.img.CreateImgFromRAI.class,(RandomAccessibleInterval<IntType>)input.getImgPlus());
-//            Img<IntType> label_img = (Img<IntType>) opService.run(net.imagej.ops.create.img.CreateImgFromRAI.class,(RandomAccessibleInterval<IntType>)label.getImgPlus());
-
-
-
-            ImgPlus img_imp = input.getImgPlus();
-
-            ImgPlus label_imp = label.getImgPlus();
-
-
-
-            Img<IntType> ii = opService.convert().int32(img_imp.getImg());
-            Img<IntType> jj = opService.convert().int32(label_imp);
-
-            openInLabelEditor(jj,jj);
-
-//            Cursor<IntType> curs = ii.cursor();
-//            int maxVal = -1;
-//            // iterate over the input
-//            while ( curs.hasNext()) {
-//                curs.fwd();
-//                maxVal = ((int)curs.get().getInteger()>maxVal)?(int)curs.get().getInteger():maxVal;
-//            }
-//
-//
-//            ii.dimensions(dims);
-//
-//            System.out.println(" MAXREAL " + maxVal + " "+  Arrays.toString(dims));
-//
-//
-//            openInLabelEditor(jj,jj);
-//
-//            ImgLabeling<IntType, IntType> labeling = new ImgLabeling(label);
-
-
 
         } catch (InterruptedException | ExecutionException | IOException e) {
             e.printStackTrace();
@@ -355,78 +294,10 @@ public class StarDist3D extends StarDist3DBase implements Command {
     }
 
 
-    private static void openInLabelEditor(Img<IntType> img, Img<IntType> label) {
-
-        ImgLabeling<Integer, IntType> labeling = Utils.convertImgToLabelImage(label);
-
-
-        LabelEditorModel model = new DefaultLabelEditorModel<>(labeling, img);
-
-        Random random = new Random();
-        for (Integer lab : labeling.getMapping().getLabels()) {
-            System.out.println(lab);
-            // assign each label also as a tag to itself (so you can set colors for each label separately)
-            model.tagging().addTagToLabel(lab, lab);
-            // add random color to each tag
-            model.colors().getBorderColor(lab).set(random.nextInt(255), random.nextInt(255), random.nextInt(255), 200);
-        }
-
-        model.colors().getFocusFaceColor().set(255,255,0,255);
-        model.colors().getSelectedFaceColor().set(0,255,255,255);
-
-
-
-        LabelEditorBdvPanel<IntType> panel = new LabelEditorBdvPanel<>();
-
-        panel.setMode3D(true);
-
-//        // (don't forget to inject the context to get all the IJ2 goodies, but it should also work (with a limited set of features) without this)
-//        ij.context().inject(panel);
-
-        panel.init(model);
-
-        // .. maybe set the display range for the inputs..
-        panel.getSources().forEach(source -> source.setDisplayRange(0, 200));
-
-
-        // .. and create a frame to show the panel.
-        JFrame frame = new JFrame("Label editor");
-        frame.setContentPane(panel.get());
-        frame.setMinimumSize(new Dimension(500,500));
-        frame.pack();
-        frame.setVisible(true);
-
-    }
-
-    private static void testLabeling(ImageJ ij) throws IOException {
-
-        final ImgFactory<IntType> imgFactory = new CellImgFactory<IntType>( new IntType());
-        final Img<IntType> img = imgFactory.create( 100,100,10);
-        final RandomAccess<IntType> curs = img.randomAccess();
-        for (int i = 0; i < 50; i++) {
-            curs.setPosition(new long[]{20+i,20+i,0});
-            curs.get().set((byte)((5*(i%10))%255+2));
-        }
-
-//        Dataset input = ij.scifio().datasetIO().open(StarDist3D.class.getClassLoader().getResource("img3d.tif").getFile());
-//
-//        Img<IntType> img = input.getImgPlus().getImg();
-
-
-        Img binary = img;
-//
-//        Img<IntType> binary = ij.op().convert().int32(ij.op().threshold().otsu(img));
-
-        openInLabelEditor(img, binary);
-    }
-
 
     public static void main(final String... args) throws Exception {
         final ImageJ ij = new ImageJ();
         ij.launch(args);
-//
-//        testLabeling(ij);
-
 
         Dataset input = ij.scifio().datasetIO().open(StarDist3D.class.getClassLoader().getResource("img3d.tif").getFile());
         ij.ui().show(input);
@@ -438,7 +309,6 @@ public class StarDist3D extends StarDist3DBase implements Command {
         params.put("rayFile", rayFile);
         params.put("nTiles", 1);
         params.put("probThresh", .6);
-        params.put("openLabelEditor", true);
 
         ij.command().run(StarDist3D.class, true, params);
 
