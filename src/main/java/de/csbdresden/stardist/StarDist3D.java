@@ -130,39 +130,11 @@ public class StarDist3D extends StarDist3DBase implements Command {
                     vertsAndFaces.getA(), vertsAndFaces.getB(), dims);
 
             // show in LabelEditor
-//            Img<IntType> input_img = (Img<IntType>) opService.run(net.imagej.ops.create.img.CreateImgFromRAI.class,(RandomAccessibleInterval<IntType>)input.getImgPlus());
-//            Img<IntType> label_img = (Img<IntType>) opService.run(net.imagej.ops.create.img.CreateImgFromRAI.class,(RandomAccessibleInterval<IntType>)label.getImgPlus());
-
-
-
             ImgPlus img_imp = input.getImgPlus();
-
             ImgPlus label_imp = label.getImgPlus();
-
-
-
             Img<IntType> ii = opService.convert().int32(img_imp.getImg());
             Img<IntType> jj = opService.convert().int32(label_imp);
-
             openInLabelEditor(jj,jj);
-
-//            Cursor<IntType> curs = ii.cursor();
-//            int maxVal = -1;
-//            // iterate over the input
-//            while ( curs.hasNext()) {
-//                curs.fwd();
-//                maxVal = ((int)curs.get().getInteger()>maxVal)?(int)curs.get().getInteger():maxVal;
-//            }
-//
-//
-//            ii.dimensions(dims);
-//
-//            System.out.println(" MAXREAL " + maxVal + " "+  Arrays.toString(dims));
-//
-//
-//            openInLabelEditor(jj,jj);
-//
-//            ImgLabeling<IntType, IntType> labeling = new ImgLabeling(label);
 
 
 
