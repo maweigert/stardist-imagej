@@ -3,11 +3,7 @@ package de.csbdresden.stardist;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
 
 import de.lighti.clipper.Path;
@@ -18,7 +14,12 @@ import net.imagej.Dataset;
 import net.imagej.DatasetService;
 import net.imagej.ImgPlus;
 import net.imagej.axis.AxisType;
+import net.imglib2.Cursor;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.img.Img;
+import net.imglib2.roi.labeling.ImgLabeling;
+import net.imglib2.roi.labeling.LabelingMapping;
+import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.util.Pair;
 import net.imglib2.util.ValuePair;
 import org.json.JSONArray;
@@ -105,6 +106,40 @@ public class Utils {
         System.out.println("found "+vertices.length/3+" vertices and "+ faces.length/3 +" faces");
         return new ValuePair<float[], int[]>(vertices, faces);
 
+    }
+
+    public static ImgLabeling< Integer, IntType> convertImgToLabelImage(Img< IntType > label_img )
+    {
+        final ImgLabeling< Integer, IntType > imgLabeling = new ImgLabeling<>( label_img );
+
+        int maximumLabel = -1;
+        Cursor<IntType> curs = label_img.cursor();
+        // iterate over the input
+        while ( curs.hasNext()) {
+            curs.fwd();
+            maximumLabel = ((int)curs.get().getInteger()>maximumLabel)?(int)curs.get().getInteger():maximumLabel;
+        }
+        System.out.println("Maximum value of label image: " + maximumLabel);
+
+
+        final ArrayList<Set< Integer >> labelSets = new ArrayList< >();
+
+        labelSets.add( new HashSet<>() ); // empty 0 label
+        for ( int label = 1; label <= maximumLabel; ++label )
+        {
+            final HashSet< Integer > set = new HashSet< >();
+            set.add( label );
+            labelSets.add( set );
+        }
+
+        new LabelingMapping.SerialisationAccess< Integer >( imgLabeling.getMapping() )
+        {
+            {
+                super.setLabelSets( labelSets );
+            }
+        };
+
+        return imgLabeling;
     }
 
 }
