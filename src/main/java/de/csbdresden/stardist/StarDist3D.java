@@ -60,6 +60,10 @@ public class StarDist3D extends StarDist3DBase implements Command {
     @Parameter(label=Opt.PROB_THRESH, stepSize="0.05", min="0", max="1", style= NumberWidget.SLIDER_STYLE)
     private double probThresh = (double) Opt.getDefault(Opt.PROB_THRESH);
 
+
+    @Parameter(label=Opt.NUM_TILES, min="1", stepSize="1")
+    private int nTiles = (int) Opt.getDefault(Opt.NUM_TILES);
+
     @Parameter(label=Opt.LABEL_IMAGE, type=ItemIO.OUTPUT)
     private Dataset label;
 
@@ -74,9 +78,9 @@ public class StarDist3D extends StarDist3DBase implements Command {
             paramsCNN.put("percentileBottom", 1);
             paramsCNN.put("percentileTop", 99.8);
             paramsCNN.put("clip", false);
-            paramsCNN.put("nTiles", 1);
-            paramsCNN.put("blockMultiple", 16);
-            paramsCNN.put("overlap", 16);
+            paramsCNN.put("nTiles", nTiles);
+            paramsCNN.put("blockMultiple", 32);
+            paramsCNN.put("overlap", 32);
             paramsCNN.put("batchSize", 1);
             paramsCNN.put("showProgressDialog", true);
             paramsCNN.put("modelFile", modelFile);
