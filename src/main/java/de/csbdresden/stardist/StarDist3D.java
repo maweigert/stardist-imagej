@@ -2,6 +2,7 @@ package de.csbdresden.stardist;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
+import com.sun.jna.NativeLibrary;
 import ij.IJ;
 import ij.ImagePlus;
 import net.imagej.Dataset;
@@ -25,6 +26,7 @@ import org.scijava.menu.MenuConstants;
 import org.scijava.plugin.Menu;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
+import org.scijava.widget.NumberWidget;
 
 import java.io.File;
 import java.io.IOException;
@@ -55,6 +57,9 @@ public class StarDist3D extends StarDist3DBase implements Command {
     @Parameter(label="Ray File", required=true)
     private File rayFile;
 
+    @Parameter(label=Opt.PROB_THRESH, stepSize="0.05", min="0", max="1", style= NumberWidget.SLIDER_STYLE)
+    private double probThresh = (double) Opt.getDefault(Opt.PROB_THRESH);
+
     @Parameter(label=Opt.LABEL_IMAGE, type=ItemIO.OUTPUT)
     private Dataset label;
 
@@ -62,6 +67,7 @@ public class StarDist3D extends StarDist3DBase implements Command {
     @Override
     public void run() {
         try {
+
             final HashMap<String, Object> paramsCNN = new HashMap<>();
             paramsCNN.put("input", input);
             paramsCNN.put("normalizeInput", true);
@@ -82,9 +88,6 @@ public class StarDist3D extends StarDist3DBase implements Command {
 
             final Pair<Dataset, Dataset> probAndDist = splitPrediction(prediction);
 
-
-            final float probThresh = 0.6f;
-
             Pair<float[], int[]> vertsAndFaces = Utils.readRayVerticesFaces(rayFile);
 
 
@@ -96,7 +99,7 @@ public class StarDist3D extends StarDist3DBase implements Command {
             float [] pointArray = (float[]) probDistPoints[2];
 
             status.showStatus(50,100,"Filtering "+probArray.length+" candidates ...");
-            Pair<float[], float[]> distAndPointSurvivor = NonMaximumSuppressionSparse(probArray, distArray, pointArray,  vertsAndFaces.getA(), vertsAndFaces.getB());
+            Pair<float[], float[]> distAndPointSurvivor = NonMaximumSuppressionSparse(probArray, distArray, pointArray,  vertsAndFaces.getA(), vertsAndFaces.getB(), (float)probThresh);
 
             long [] dims = new long[3];
             input.dimensions(dims);
@@ -111,20 +114,29 @@ public class StarDist3D extends StarDist3DBase implements Command {
 
 
     public interface LIBStardist3d extends Library {
-        LIBStardist3d INSTANCE = (LIBStardist3d) Native.loadLibrary("/Users/mweigert/java/stardist-imagej-3d/src/main/cpp/libstardist3d.dylib",
-                LIBStardist3d.class);
-        void non_maximum_suppression_sparse(float[] prob, float[] dist, float[] points,
-                                            int n_polys, int n_rays, int n_faces, float[] verts, int[] faces, boolean[] results);
 
-        void polyhedron_to_label(float[] dist, float[] points,
+        LIBStardist3d INSTANCE = (LIBStardist3d) Native.loadLibrary("stardist3d",
+                LIBStardist3d.class);
+
+        void _LIB_non_maximum_suppression_sparse(float[] prob, float[] dist, float[] points,
+                                            int n_polys, int n_rays, int n_faces,
+                                            float[] verts, int[] faces,
+                                            float threshold, int use_bbox, int verbose,
+                                            boolean[] results);
+
+        void _LIB_polyhedron_to_label(float[] dist, float[] points,
                                  float[] verts, int[] faces,
                                  int n_polys, int n_rays, int n_faces,
-                                 int[] labels, int nz, int ny, int nx, int[] result);
+                                 int[] labels,
+                                 int nz, int ny, int nx,
+                                 int render_mode, int verbose,
+                                 int use_overlap_label, int overlap_label,
+                                 int[] result);
 
     }
 
     private Pair<float[], float[]> NonMaximumSuppressionSparse(float[] probArray, float[] distArray, float[] pointArray,
-                                             float[] vertArray, int[] faceArray) {
+                                             float[] vertArray, int[] faceArray, final float threshold ) {
         // this method wraps an existing c++ implementation provided as a library
         System.out.println("calling c code...");
 
@@ -134,10 +146,16 @@ public class StarDist3D extends StarDist3DBase implements Command {
 
         boolean[] nms_survivors = new boolean[n_polys];
 
+        int use_bbox = 1;
+        int verbose = 1;
+
+
         System.out.println(distArray.length);
-        LIBStardist3d.INSTANCE.non_maximum_suppression_sparse(probArray, distArray,  pointArray,
+        LIBStardist3d.INSTANCE._LIB_non_maximum_suppression_sparse(probArray, distArray,  pointArray,
                 n_polys, n_rays, n_faces,
-                vertArray, faceArray,nms_survivors);
+                vertArray, faceArray,
+                threshold, use_bbox, verbose,
+                nms_survivors);
 
         int nSurvivors = 0;
 
@@ -174,8 +192,15 @@ public class StarDist3D extends StarDist3DBase implements Command {
         for (int i = 0; i < n_polys; i++)
             labels[i] = i+1;
 
-        LIBStardist3d.INSTANCE.polyhedron_to_label(dist, points,verts, faces,
-                n_polys, n_rays, n_faces, labels, (int)dims[2], (int)dims[1], (int)dims[0], result);
+        int render_mode=0;
+        int verbose = 1;
+        int use_overlap_label = 0;
+        int overlap_label = 0;
+
+        LIBStardist3d.INSTANCE._LIB_polyhedron_to_label(dist, points,verts, faces,
+                n_polys, n_rays, n_faces, labels, (int)dims[2], (int)dims[1], (int)dims[0],
+                render_mode, verbose, use_overlap_label, overlap_label,
+                result);
 
         ArrayImg<UnsignedIntType, IntArray> img = ArrayImgs.unsignedInts(result, dims);
 
@@ -185,7 +210,7 @@ public class StarDist3D extends StarDist3DBase implements Command {
 
     // get candidates as float[] arrays
     // if thats the only way to do it, I'll kill myself
-    private Object[] filterCandidates(Pair<Dataset, Dataset> probAndDist, float prob_thresh) {
+    private Object[] filterCandidates(Pair<Dataset, Dataset> probAndDist, double prob_thresh) {
 
         final RandomAccessibleInterval<FloatType> prob = (RandomAccessibleInterval<FloatType>) probAndDist.getA().getImgPlus();
         final RandomAccessibleInterval<FloatType> dist = (RandomAccessibleInterval<FloatType>) probAndDist.getB().getImgPlus();
@@ -275,6 +300,7 @@ public class StarDist3D extends StarDist3DBase implements Command {
         final ImageJ ij = new ImageJ();
         ij.launch(args);
 
+
         Dataset input = ij.scifio().datasetIO().open(StarDist3D.class.getClassLoader().getResource("img3d.tif").getFile());
         ij.ui().show(input);
         final HashMap<String, Object> params = new HashMap<>();
@@ -283,6 +309,12 @@ public class StarDist3D extends StarDist3DBase implements Command {
         File rayFile = new File(StarDist3D.class.getClassLoader().getResource("model_rays.json").getFile());
         params.put("modelFile", modelFile);
         params.put("rayFile", rayFile);
+
+        // add resource folder to lib search path for testing (put libstardist.dylib in resources)
+        //String resourceFolder = modelFile.getParent().toString();
+        //        NativeLibrary.addSearchPath("libstardist3d.dylib", resourceFolder);
+        //System.out.println(Arrays.toString((new File(resourceFolder)).list()));
+
         ij.command().run(StarDist3D.class, true, params);
 
     }
