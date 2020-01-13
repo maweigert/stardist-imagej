@@ -91,12 +91,7 @@ public class StarDist3D extends StarDist3DBase implements Command {
             status.showStatus(0,100,"Predicting probabilities and distances...");
 
             final Future<CommandModule> futureCNN = command.run(de.csbdresden.csbdeep.commands.GenericNetwork.class, false, paramsCNN);
-            final Dataset prediction2 = (Dataset) futureCNN.get().getOutput("output");
-
-            final ImgFactory< FloatType > imgFactory = new CellImgFactory<>( new FloatType(), 5 );
-            final Img< FloatType > prediction_img = imgFactory.create( 256, 256, 256, 96+1 );
-            final Dataset prediction = dataset.create(new ImgPlus(prediction_img));
-
+            final Dataset prediction = (Dataset) futureCNN.get().getOutput("output");
 
             final Pair<Dataset, Dataset> probAndDist = splitPrediction(prediction);
 
